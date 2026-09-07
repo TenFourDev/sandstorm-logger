@@ -1,0 +1,13 @@
+services:
+  sandstorm-logger:
+    container_name: sandstorm-logger
+    build:
+      context: .
+      network: host
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      DISCORD_TOKEN: ${DISCORD_TOKEN:?Set DISCORD_TOKEN in ./.env}
+      # CONFIG_FILE: /app/config.yaml
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro

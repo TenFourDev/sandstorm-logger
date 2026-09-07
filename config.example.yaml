@@ -1,0 +1,6 @@
+servers:
+  - name: 'Main Server'
+    channelId: '...'
+    logFilePath: '.../Insurgency.log'
+    playerJoinFormat: '{name} joined the server'
+    playerLeaveFormat: '{name} left the server'

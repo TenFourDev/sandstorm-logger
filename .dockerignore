@@ -1,0 +1,23 @@
+# Dependencies and build artifacts
+node_modules
+dist
+build
+
+# Never bake secrets into the image — config.yaml is mounted at runtime
+config.yaml
+config.yml
+.env
+.env.*
+
+# Logs and temp files
+logs
+*.log
+coverage
+.temp
+.tmp
+
+# VCS and IDE
+.git
+.gitignore
+.vscode
+.idea
