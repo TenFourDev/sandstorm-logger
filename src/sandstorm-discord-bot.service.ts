@@ -69,13 +69,13 @@ export class SandstormDiscordBotService implements OnModuleInit {
       this.sendDiscordMessage(server.channelId, message);
     });
 
-    reader.on('message', (event) => {
-      this.logger.log(
-        `Chat message event received from ${event.playerName} on server ${index}: ${event.message}`,
-      );
-      const message = `[${event.playerName}] ${event.message}`;
-      this.sendDiscordMessage(server.channelId, message);
-    });
+    // reader.on('message', (event) => {
+    //   this.logger.log(
+    //     `Chat message event received from ${event.playerName} on server ${index}: ${event.message}`,
+    //   );
+    //   const message = `[${event.playerName}] ${event.message}`;
+    //   this.sendDiscordMessage(server.channelId, message);
+    // });
 
     reader.on('error', (error: unknown) => {
       const message = error instanceof Error ? error.message : String(error);
