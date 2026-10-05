@@ -1,6 +1,16 @@
+discordToken: '' # Optional
 servers:
   - name: 'Main Server'
-    channelId: '...'
     logFilePath: '.../Insurgency.log'
-    playerJoinFormat: '{name} joined the server'
-    playerLeaveFormat: '{name} left the server'
+
+    # Optional: broadcast join/leave messages on Discord channel, requires discordToken
+    discordChannelId: '...'
+    discordPlayerJoinFormat: '{name} joined the server'
+    discordPlayerLeaveFormat: '{name} left the server'
+
+    # Optional: broadcast join/leave messages in-game through RCON.
+    rconHost: '127.0.0.1'
+    rconPort: 27015
+    rconPassword: 'your-rcon-password'
+    inGamePlayerJoinFormat: '{name} joined the server'
+    inGamePlayerLeaveFormat: '{name} left the server'

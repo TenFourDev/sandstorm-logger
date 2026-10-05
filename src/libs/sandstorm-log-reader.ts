@@ -28,19 +28,40 @@ export interface SandstormMessageEvent {
   message: string;
 }
 
+export interface SandstormProjectileSpawnedEvent {
+  index: number;
+  projectileName: string;
+  steamId: string;
+}
+
 interface PlayerRecord {
   name: string;
   steamId: string;
   platform: string;
 }
 
-export class SandstormLogReader extends EventEmitter {
+type SandstormLogReaderEvents = {
+  projectileSpawned: (event: SandstormProjectileSpawnedEvent) => void;
+  playerConnected: (event: SandstormPlayerConnectedEvent) => void;
+  playerDisconnected: (event: SandstormPlayerDisconnectedEvent) => void;
+  message: (event: SandstormMessageEvent) => void;
+  mapChange: (event: { index: number; map: string; scenario: string }) => void;
+  mapRestart: (event: { index: number; map: string; scenario: string }) => void;
+  stateChange: (event: { index: number; oldState: string; newState: string }) => void;
+  error: (error: unknown) => void;
+};
+
+const TypedEventEmitter =
+  EventEmitter as unknown as new () => import('typed-emitter').default<SandstormLogReaderEvents>;
+
+export class SandstormLogReader extends TypedEventEmitter {
   private readonly totalLines: number;
   private readonly logFilePath: string;
   private readonly index: number;
   private tempLastLineChat: string[] = [];
   private players: PlayerRecord[] = [];
   private currentMap?: { map: string; scenario: string };
+  private seenProjectiles: Set<string> = new Set();
 
   constructor(logFilePath: string, index = 0, totalLines = 200) {
     super();
@@ -91,14 +112,14 @@ export class SandstormLogReader extends EventEmitter {
             continue;
           }
 
-          const playerName = playerData[1];
+          const playerName = playerData[1].replace('??ScoreboardBadge=1', '');
           const steamId = playerData[2];
           const platform = playerData[3];
 
           const existingPlayer = this.players.find((player) => player.steamId === steamId);
           if (!existingPlayer) {
             this.players.push({ name: playerName, steamId, platform });
-            this.emit('player_connected', {
+            this.emit('playerConnected', {
               index: this.index,
               playerName,
               steamId,
@@ -115,7 +136,7 @@ export class SandstormLogReader extends EventEmitter {
           const steamId = steamIdMatch[1];
           const disconnectedPlayer = this.players.find((player) => player.steamId === steamId);
           if (disconnectedPlayer) {
-            this.emit('player_disconnected', {
+            this.emit('playerDisconnected', {
               index: this.index,
               playerName: disconnectedPlayer.name,
               steamId,
@@ -160,7 +181,7 @@ export class SandstormLogReader extends EventEmitter {
           const travelTarget = travelMatch[1];
           if (travelTarget.includes('?restart')) {
             if (this.currentMap) {
-              this.emit('map_restart', {
+              this.emit('mapRestart', {
                 index: this.index,
                 map: this.currentMap.map,
                 scenario: this.currentMap.scenario,
@@ -172,7 +193,7 @@ export class SandstormLogReader extends EventEmitter {
               const map = mapMatch[1];
               const scenario = mapMatch[2];
               this.currentMap = { map, scenario };
-              this.emit('map_change', { index: this.index, map, scenario });
+              this.emit('mapChange', { index: this.index, map, scenario });
             }
           }
         } else if (line.includes(']LogGameMode: Display: State: ')) {
@@ -184,11 +205,39 @@ export class SandstormLogReader extends EventEmitter {
 
           const stateData = stateMatch[1].match(/(.*) -> (.*)/i);
           if (stateData && stateData.length >= 3) {
-            this.emit('state_change', {
+            this.emit('stateChange', {
               index: this.index,
               oldState: stateData[1],
               newState: stateData[2],
             });
+          }
+        } else if (
+          line.includes(']LogNetPartialBunch:') &&
+          line.includes('Actor: BP_Projectile_')
+        ) {
+          const projectileMatch = line.match(
+            /\]LogNetPartialBunch: .*\[UActorChannel\] Actor: (BP_Projectile_\S+?) \S+?PersistentLevel\.\1_(\d+),.*UniqueId: (SteamNWI:\d+)/i,
+          );
+          if (!projectileMatch || projectileMatch.length < 4) {
+            this.tempLastLineChat.push(line);
+            continue;
+          }
+
+          const projectileName = projectileMatch[1];
+          const projectileId = projectileMatch[2];
+          const steamId = projectileMatch[3];
+
+          // Each projectile actor is replicated more than once; only report the first sighting.
+          if (!this.seenProjectiles.has(projectileId)) {
+            if (this.seenProjectiles.size >= 1000) {
+              this.seenProjectiles.clear();
+            }
+            this.seenProjectiles.add(projectileId);
+            this.emit('projectileSpawned', {
+              index: this.index,
+              projectileName,
+              steamId,
+            } satisfies SandstormProjectileSpawnedEvent);
           }
         }
 

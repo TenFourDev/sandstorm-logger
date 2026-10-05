@@ -7,13 +7,19 @@ import type { AppConfig, ServerConfig } from './config.types.js';
 
 const serverSchema = Joi.object({
   name: Joi.string().min(1).required(),
-  channelId: Joi.string().min(1).required(),
   logFilePath: Joi.string().min(1).required(),
-  playerJoinFormat: Joi.string().min(1).default('{name} joined the server'),
-  playerLeaveFormat: Joi.string().min(1).default('{name} left the server'),
+  discordChannelId: Joi.string().min(1).allow(null).optional(),
+  discordPlayerJoinFormat: Joi.string().min(1).allow(null).optional(),
+  discordPlayerLeaveFormat: Joi.string().min(1).allow(null).optional(),
+  rconHost: Joi.string().min(1).allow(null).optional(),
+  rconPort: Joi.number().integer().min(1).max(65535).allow(null).optional(),
+  rconPassword: Joi.string().min(1).allow(null).optional(),
+  inGamePlayerJoinFormat: Joi.string().min(1).allow(null).optional(),
+  inGamePlayerLeaveFormat: Joi.string().min(1).allow(null).optional(),
 });
 
 const configSchema = Joi.object({
+  discordToken: Joi.string().min(1).allow('').optional(),
   servers: Joi.array().items(serverSchema).min(1).required(),
 });
 
@@ -21,11 +27,14 @@ const configSchema = Joi.object({
 export class ConfigService {
   private readonly logger = new Logger(ConfigService.name);
   readonly config: AppConfig;
+  readonly discordToken?: string;
 
   constructor() {
     const filePath = this.resolveConfigPath();
     const raw = this.load(filePath);
-    this.config = this.validate(raw);
+    const validated = this.validate(raw);
+    this.config = validated;
+    this.discordToken = validated.discordToken;
     this.logger.log(`Loaded ${this.config.servers.length} server config(s) from ${filePath}`);
   }
 
@@ -73,6 +82,50 @@ export class ConfigService {
         .join('\n');
       throw new Error(`Invalid config:\n${details}`);
     }
-    return value as AppConfig;
+
+    const validated = value as AppConfig;
+    this.assertRconConfig(validated);
+    return validated;
+  }
+
+  private assertRconConfig(config: AppConfig): void {
+    const rconFields = ['rconHost', 'rconPort', 'rconPassword'] as const;
+    const problems: string[] = [];
+
+    for (const server of config.servers) {
+      const usesInGameMessaging = Boolean(
+        server.inGamePlayerJoinFormat || server.inGamePlayerLeaveFormat,
+      );
+      if (!usesInGameMessaging) {
+        continue;
+      }
+
+      const missing = rconFields.filter(
+        (field) => server[field] === undefined || server[field] === null,
+      );
+      if (missing.length > 0) {
+        problems.push(
+          `  - servers.${server.name}: ${missing.join(', ')} required when inGamePlayerJoinFormat/inGamePlayerLeaveFormat is set`,
+        );
+      }
+    }
+
+    if (problems.length > 0) {
+      throw new Error(`Invalid config:\n${problems.join('\n')}`);
+    }
+  }
+
+  private assertDiscordChannelId(config: AppConfig): void {
+    const problems: string[] = [];
+
+    for (const server of config.servers) {
+      if (!server.discordChannelId) {
+        problems.push(`  - servers.${server.name}: discordChannelId is required`);
+      }
+    }
+
+    if (problems.length > 0) {
+      throw new Error(`Invalid config:\n${problems.join('\n')}`);
+    }
   }
 }
