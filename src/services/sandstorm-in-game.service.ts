@@ -47,7 +47,7 @@ export class SandstormInGameService implements OnModuleInit, OnModuleDestroy {
       const template = server.inGamePlayerJoinFormat;
       if (!template) return;
 
-      this.logger.log(`["${server.name}"] In-game join message for ${data.playerName}`);
+      this.logger.log(`[${server.name}] In-game join message for ${data.playerName}`);
       void this.say(server, this.formatMessage(template, data));
     });
 
@@ -55,7 +55,7 @@ export class SandstormInGameService implements OnModuleInit, OnModuleDestroy {
       const template = server.inGamePlayerLeaveFormat;
       if (!template) return;
 
-      this.logger.log(`["${server.name}"] In-game leave message for ${data.playerName}`);
+      this.logger.log(`[${server.name}] In-game leave message for ${data.playerName}`);
       void this.say(server, this.formatMessage(template, data));
     });
   }
@@ -68,17 +68,17 @@ export class SandstormInGameService implements OnModuleInit, OnModuleDestroy {
     const client = await this.ensureConnection(server);
     if (!client) {
       this.logger.warn(
-        `["${server.name}"] Failed to run "say" because RCON client is not available.`,
+        `[${server.name}] Failed to run "say" because RCON client is not available.`,
       );
       return;
     }
 
     try {
       await client.send(`say ${this.sanitize(content)}`);
-      this.logger.log(`["${server.name}"] Ran "say": ${content}`);
+      this.logger.log(`[${server.name}] Ran "say": ${content}`);
     } catch (error) {
       this.connections.delete(server.name);
-      this.logger.error(`["${server.name}"] Failed to run "say": ${this.describeError(error)}`);
+      this.logger.error(`[${server.name}] Failed to run "say": ${this.describeError(error)}`);
     }
   }
 
@@ -97,7 +97,7 @@ export class SandstormInGameService implements OnModuleInit, OnModuleDestroy {
 
   private async connect(server: ServerConfig): Promise<RconConnection | null> {
     if (!server.rconHost || !server.rconPort || !server.rconPassword) {
-      this.logger.warn(`["${server.name}"] Rcon configuration is missing.`);
+      this.logger.warn(`[${server.name}] Rcon configuration is missing.`);
       return null;
     }
 
@@ -111,11 +111,11 @@ export class SandstormInGameService implements OnModuleInit, OnModuleDestroy {
     try {
       await client.connect();
       this.connections.set(server.name, client);
-      this.logger.log(`["${server.name}"] RCON connected at ${server.rconHost}:${server.rconPort}`);
+      this.logger.log(`[${server.name}] RCON connected at ${server.rconHost}:${server.rconPort}`);
       return client;
     } catch (error) {
       this.logger.error(
-        `["${server.name}"] Failed to connect to RCON at ${server.rconHost}:${server.rconPort}: ${this.describeError(error)}`,
+        `[${server.name}] Failed to connect to RCON at ${server.rconHost}:${server.rconPort}: ${this.describeError(error)}`,
       );
       return null;
     }
