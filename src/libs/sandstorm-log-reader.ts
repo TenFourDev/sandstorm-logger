@@ -112,7 +112,7 @@ export class SandstormLogReader extends TypedEventEmitter {
             continue;
           }
 
-          const playerName = playerData[1].replace('??ScoreboardBadge=1', '');
+          const playerName = playerData[1].replace(/\?\?.*$/, '');
           const steamId = playerData[2];
           const platform = playerData[3];
 
