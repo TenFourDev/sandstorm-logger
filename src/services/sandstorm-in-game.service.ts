@@ -45,9 +45,7 @@ export class SandstormInGameService implements OnModuleInit, OnModuleDestroy {
   private registerListeners(): void {
     this.sandstormWatcherService.read('playerConnected', (server, data) => {
       this.playerNames.set(this.steamIdKey(data.steamId), data.playerName);
-      this.logger.log(
-        `[${server.name}] Player connected: ${data.playerName} (${data.steamId})`,
-      );
+      this.logger.log(`[${server.name}] Player connected: ${data.playerName} (${data.steamId})`);
 
       const template = server.inGamePlayerJoinFormat;
       if (!template) return;
@@ -67,7 +65,7 @@ export class SandstormInGameService implements OnModuleInit, OnModuleDestroy {
     this.sandstormWatcherService.read('projectileSpawned', (server, data) => {
       const smokeLimit = server.smokeLimitPerRound;
       if (smokeLimit == null) return;
-      
+
       const projectileName = data.projectileName.toLowerCase();
       if (!projectileName.includes('smoke') && !projectileName.includes('m18')) {
         return;
@@ -77,9 +75,7 @@ export class SandstormInGameService implements OnModuleInit, OnModuleDestroy {
       const playerName = this.playerNames.get(this.steamIdKey(data.steamId)) ?? data.steamId;
       const announceThreshold = server.smokeAnnounceThreshold ?? 1;
 
-      this.logger.debug(
-        `[${server.name}] ${playerName} Smoke deployed: ${count} / ${smokeLimit}`,
-      );
+      this.logger.debug(`[${server.name}] ${playerName} Smoke deployed: ${count} / ${smokeLimit}`);
       if (count >= announceThreshold) {
         void this.say(server, `[${playerName}] Smoke deployed: ${count} / ${smokeLimit}`);
       }
@@ -156,7 +152,9 @@ export class SandstormInGameService implements OnModuleInit, OnModuleDestroy {
       this.logger.log(`[${server.name}] Ran "${command}"`);
     } catch (error) {
       this.connections.delete(server.name);
-      this.logger.error(`[${server.name}] Failed to run "${command}": ${this.describeError(error)}`);
+      this.logger.error(
+        `[${server.name}] Failed to run "${command}": ${this.describeError(error)}`,
+      );
     }
   }
 
