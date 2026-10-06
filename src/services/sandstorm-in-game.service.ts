@@ -135,7 +135,7 @@ export class SandstormInGameService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async kick(server: ServerConfig, steamId: string, reason: string): Promise<void> {
-    await this.run(server, `kick ${this.steamIdKey(steamId)} ${reason}`);
+    await this.run(server, `kick ${this.steamIdKey(steamId)} "${reason}"`);
   }
 
   private async run(server: ServerConfig, command: string): Promise<void> {
