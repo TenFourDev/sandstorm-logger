@@ -34,6 +34,10 @@ export interface SandstormProjectileSpawnedEvent {
   steamId: string;
 }
 
+export interface SandstormRoundStartedEvent {
+  index: number;
+}
+
 interface PlayerRecord {
   name: string;
   steamId: string;
@@ -48,6 +52,7 @@ type SandstormLogReaderEvents = {
   mapChange: (event: { index: number; map: string; scenario: string }) => void;
   mapRestart: (event: { index: number; map: string; scenario: string }) => void;
   stateChange: (event: { index: number; oldState: string; newState: string }) => void;
+  roundStart: (event: SandstormRoundStartedEvent) => void;
   error: (error: unknown) => void;
 };
 
@@ -205,11 +210,18 @@ export class SandstormLogReader extends TypedEventEmitter {
 
           const stateData = stateMatch[1].match(/(.*) -> (.*)/i);
           if (stateData && stateData.length >= 3) {
+            const oldState = stateData[1];
+            const newState = stateData[2];
+
             this.emit('stateChange', {
               index: this.index,
-              oldState: stateData[1],
-              newState: stateData[2],
+              oldState,
+              newState,
             });
+
+            if (oldState === 'PreRound' && newState === 'RoundActive') {
+              this.emit('roundStart', { index: this.index };
+            }
           }
         } else if (
           line.includes(']LogNetPartialBunch:') &&
@@ -237,7 +249,7 @@ export class SandstormLogReader extends TypedEventEmitter {
               index: this.index,
               projectileName,
               steamId,
-            } satisfies SandstormProjectileSpawnedEvent);
+            });
           }
         }
 

@@ -4,9 +4,11 @@ import { ConfigService } from '../config/config.service.js';
 import type { ServerConfig } from '../config/config.types.js';
 import {
   SandstormLogReader,
+  SandstormProjectileSpawnedEvent,
   type SandstormMessageEvent,
   type SandstormPlayerConnectedEvent,
   type SandstormPlayerDisconnectedEvent,
+  type SandstormRoundStartedEvent,
 } from '../libs/sandstorm-log-reader.js';
 
 type SandstormMapChangedEvent = { index: number; map: string; scenario: string };
@@ -15,10 +17,12 @@ type SandstormStateChangedEvent = { index: number; oldState: string; newState: s
 type SandstormWatcherEvents = {
   playerConnected: (server: ServerConfig, eventData: SandstormPlayerConnectedEvent) => void;
   playerDisconnected: (server: ServerConfig, eventData: SandstormPlayerDisconnectedEvent) => void;
+  projectileSpawned: (server: ServerConfig, eventData: SandstormProjectileSpawnedEvent) => void;
   message: (server: ServerConfig, eventData: SandstormMessageEvent) => void;
   mapChange: (server: ServerConfig, eventData: SandstormMapChangedEvent) => void;
   mapRestart: (server: ServerConfig, eventData: SandstormMapChangedEvent) => void;
   stateChange: (server: ServerConfig, eventData: SandstormStateChangedEvent) => void;
+  roundStart: (server: ServerConfig, eventData: SandstormRoundStartedEvent) => void;
   error: (server: ServerConfig, eventData: unknown) => void;
 };
 
@@ -68,6 +72,9 @@ export class SandstormWatcherService extends TypedEventEmitter implements OnModu
       reader.on('playerDisconnected', (eventData) => {
         this.emit('playerDisconnected', server, eventData);
       });
+      reader.on('projectileSpawned', (eventData) => {
+        this.emit('projectileSpawned', server, eventData);
+      });
       reader.on('message', (eventData) => {
         this.emit('message', server, eventData);
       });
@@ -79,6 +86,9 @@ export class SandstormWatcherService extends TypedEventEmitter implements OnModu
       });
       reader.on('stateChange', (eventData) => {
         this.emit('stateChange', server, eventData);
+      });
+      reader.on('roundStart', (eventData) => {
+        this.emit('roundStart', server, eventData);
       });
       reader.on('error', (error) => {
         this.logger.error(
