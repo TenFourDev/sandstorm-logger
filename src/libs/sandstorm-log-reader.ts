@@ -4,7 +4,7 @@
  */
 
 import { EventEmitter } from 'node:events';
-import { existsSync, readFileSync, watch } from 'node:fs';
+import { closeSync, existsSync, openSync, readSync, statSync, watch } from 'node:fs';
 
 export interface SandstormPlayerConnectedEvent {
   index: number;
@@ -73,6 +73,7 @@ export class SandstormLogReader extends TypedEventEmitter {
   >();
   private controllerSteamIds = new Map<string, string>();
   private pawnControllers = new Map<string, string>();
+  private readOffset?: number;
 
   constructor(logFilePath: string, index = 0, totalLines = 200) {
     super();
@@ -100,8 +101,7 @@ export class SandstormLogReader extends TypedEventEmitter {
 
   private async readRecentLines(): Promise<void> {
     try {
-      const content = readFileSync(this.logFilePath, 'utf8');
-      const lines = this.getLastLines(content, this.totalLines);
+      const lines = this.readNewLines();
 
       for (const line of lines) {
         if (this.tempLastLineChat.includes(line)) {
@@ -265,7 +265,7 @@ export class SandstormLogReader extends TypedEventEmitter {
               this.pendingProjectiles.set(projectileId, { pawnName, timestamp, timer });
             } else if (
               pawnName !== pending.pawnName &&
-              Math.abs(timestamp - pending.timestamp) === 0
+              Math.abs(timestamp - pending.timestamp) <= 25
             ) {
               clearTimeout(pending.timer);
               this.pendingProjectiles.delete(projectileId);
@@ -340,8 +340,60 @@ export class SandstormLogReader extends TypedEventEmitter {
     this.seenProjectiles.add(projectileId);
   }
 
-  private getLastLines(content: string, numberOfLines: number): string[] {
-    const lines = content.split(/\r?\n/).filter((line) => line.trim().length > 0);
-    return lines.slice(-numberOfLines);
+  private readNewLines(): string[] {
+    const { size } = statSync(this.logFilePath);
+
+    if (this.readOffset === undefined || size < this.readOffset) {
+      this.readOffset = undefined;
+    }
+
+    let start: number;
+    let isTailRead = false;
+    if (this.readOffset === undefined) {
+      isTailRead = true;
+      start = Math.max(0, size - Math.max(this.totalLines * 4096, 256 * 1024));
+    } else {
+      start = this.readOffset;
+    }
+
+    if (start >= size) {
+      this.readOffset = size;
+      return [];
+    }
+
+    const maxBytesPerRead = 4 * 1024 * 1024;
+    const bytesToRead = Math.min(size - start, maxBytesPerRead);
+    const buffer = Buffer.allocUnsafe(bytesToRead);
+    const fd = openSync(this.logFilePath, 'r');
+    let bytesRead: number;
+    try {
+      bytesRead = readSync(fd, buffer, 0, bytesToRead, start);
+    } finally {
+      closeSync(fd);
+    }
+
+    const chunk = buffer.toString('utf8', 0, bytesRead);
+    const lastNewline = chunk.lastIndexOf('\n');
+    if (lastNewline === -1) {
+      return [];
+    }
+
+    const consumed = chunk.slice(0, lastNewline + 1);
+    this.readOffset = start + Buffer.byteLength(consumed, 'utf8');
+
+    let text = chunk.slice(0, lastNewline);
+    if (isTailRead && start > 0) {
+      const firstNewline = text.indexOf('\n');
+      text = firstNewline === -1 ? '' : text.slice(firstNewline + 1);
+    }
+
+    const lines = text.split(/\r?\n/).filter((line) => line.trim().length > 0);
+    const result = isTailRead ? lines.slice(-this.totalLines) : lines;
+
+    if (this.readOffset < size) {
+      setImmediate(() => void this.readRecentLines());
+    }
+
+    return result;
   }
 }
