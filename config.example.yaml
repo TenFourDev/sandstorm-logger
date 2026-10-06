@@ -18,10 +18,12 @@ servers:
   
     # Optional: limit smoke projectiles per player per round (kick when exceeded).
     # Omit or set to null to disable smoke detection entirely.
-    # requires rcon connection and LogNetPartialBunch logging set to verbose on Engine.ini:
+    # requires rcon connection and some logging set to verbose on Engine.ini:
     # ```
     # [Core.Log]
-    # LogNetPartialBunch=Verbose
+    # LogSoldier=Verbose
+    # LogSpawn=Verbose
+    # LogGameMode=Verbose
     # ```
     smokeLimitPerRound: 10
     # Optional: only announce the running count from this throw onwards.

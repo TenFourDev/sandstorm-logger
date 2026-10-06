@@ -67,6 +67,12 @@ export class SandstormLogReader extends TypedEventEmitter {
   private players: PlayerRecord[] = [];
   private currentMap?: { map: string; scenario: string };
   private seenProjectiles: Set<string> = new Set();
+  private pendingProjectiles = new Map<
+    string,
+    { pawnName: string; timestamp: number; timer: ReturnType<typeof setTimeout> }
+  >();
+  private controllerSteamIds = new Map<string, string>();
+  private pawnControllers = new Map<string, string>();
 
   constructor(logFilePath: string, index = 0, totalLines = 200) {
     super();
@@ -79,7 +85,7 @@ export class SandstormLogReader extends TypedEventEmitter {
 
   private startWatching(): void {
     if (!existsSync(this.logFilePath)) {
-      this.emit('error', new Error(`Log file does not exist: ${this.logFilePath}`));
+      setTimeout(() => this.startWatching(), 1000);
       return;
     }
 
@@ -101,6 +107,9 @@ export class SandstormLogReader extends TypedEventEmitter {
         if (this.tempLastLineChat.includes(line)) {
           continue;
         }
+
+        this.trackControllerSteamId(line);
+        this.trackPossessedPawn(line);
 
         if (line.includes(']LogNet: Login request: ')) {
           const requestMatch = line.match(/\]LogNet: Login request: (.*)/i);
@@ -223,33 +232,45 @@ export class SandstormLogReader extends TypedEventEmitter {
               this.emit('roundStart', { index: this.index });
             }
           }
-        } else if (
-          line.includes(']LogNetPartialBunch:') &&
-          line.includes('Actor: BP_Projectile_')
-        ) {
-          const projectileMatch = line.match(
-            /\]LogNetPartialBunch: .*\[UActorChannel\] Actor: (BP_Projectile_\S+?) \S+?PersistentLevel\.\1_(\d+),.*UniqueId: (SteamNWI:\d+)/i,
-          );
+        } else if (line.includes(']LogSoldier: ') && line.includes(' is inside BP_Projectile_')) {
+          const projectileMatch = line.match(/(BP_Character_Player_C_\d+) is inside (BP_Projectile_\S+)_(\d+)/);
           if (!projectileMatch || projectileMatch.length < 4) {
             this.tempLastLineChat.push(line);
             continue;
           }
 
-          const projectileName = projectileMatch[1];
-          const projectileId = projectileMatch[2];
-          const steamId = projectileMatch[3];
+          const pawnName = projectileMatch[1];
+          const projectileName = projectileMatch[2];
+          const projectileId = `${projectileName}_${projectileMatch[3]}`;
 
-          // Each projectile actor is replicated more than once; only report the first sighting.
           if (!this.seenProjectiles.has(projectileId)) {
-            if (this.seenProjectiles.size >= 1000) {
-              this.seenProjectiles.clear();
+            const pending = this.pendingProjectiles.get(projectileId);
+            const timestamp = this.parseLogTimestamp(line);
+
+            if (!pending) {
+              const timer = setTimeout(() => {
+                if (!this.pendingProjectiles.delete(projectileId)) return;
+                this.markProjectileSeen(projectileId);
+
+                const steamId = this.resolveSteamIdByPawn(pawnName);
+                if (steamId) {
+                  this.emit('projectileSpawned', {
+                    index: this.index,
+                    projectileName,
+                    steamId,
+                  });
+                }
+              }, 250);
+
+              this.pendingProjectiles.set(projectileId, { pawnName, timestamp, timer });
+            } else if (
+              pawnName !== pending.pawnName &&
+              Math.abs(timestamp - pending.timestamp) === 0
+            ) {
+              clearTimeout(pending.timer);
+              this.pendingProjectiles.delete(projectileId);
+              this.markProjectileSeen(projectileId);
             }
-            this.seenProjectiles.add(projectileId);
-            this.emit('projectileSpawned', {
-              index: this.index,
-              projectileName,
-              steamId,
-            });
           }
         }
 
@@ -260,6 +281,63 @@ export class SandstormLogReader extends TypedEventEmitter {
     } catch (error) {
       this.emit('error', error);
     }
+  }
+
+  private trackControllerSteamId(line: string): void {
+    if (line.includes(' got player ')) {
+      const spawnMatch = line.match(/INSPlayerController_(\d+) got player \S+ \[(\d+)\]/);
+      if (spawnMatch) this.controllerSteamIds.set(`INSPlayerController_${spawnMatch[1]}`, spawnMatch[2]);
+      return;
+    }
+
+    if (!line.includes('PC: INSPlayerController_') || !line.includes('UniqueId: SteamNWI:')) {
+      return;
+    }
+
+    const connectionMatch = line.match(/PC: (INSPlayerController_\d+),.*UniqueId: (SteamNWI:\d+)/);
+    if (!connectionMatch) return;
+
+    this.controllerSteamIds.set(
+      connectionMatch[1],
+      connectionMatch[2].replace(/^SteamNWI:/i, ''),
+    );
+  }
+
+  private trackPossessedPawn(line: string): void {
+    if (!line.includes('PAWNREUSE: ')) return;
+    
+    const reuseMatch = line.match(
+      /PAWNREUSE: '(INSPlayerController_\d+)' (?:possessing [^']*|cached new pawn) '(BP_Character_Player_C_\d+)'/,
+    );
+
+    if (!reuseMatch) return;
+    this.pawnControllers.set(reuseMatch[2], reuseMatch[1]);
+  }
+
+  private resolveSteamIdByPawn(pawnName: string): string | undefined {
+    const controllerName = this.pawnControllers.get(pawnName);
+    if (!controllerName) return undefined;
+
+    return this.controllerSteamIds.get(controllerName);
+  }
+
+  private parseLogTimestamp(line: string): number {
+    const match = line.match(/-(\d{2})\.(\d{2})\.(\d{2}):(\d{3})\]/);
+    if (!match) return 0;
+
+    const hours = Number(match[1]);
+    const minutes = Number(match[2]);
+    const seconds = Number(match[3]);
+    const milliseconds = Number(match[4]);
+    return ((hours * 60 + minutes) * 60 + seconds) * 1000 + milliseconds;
+  }
+
+  private markProjectileSeen(projectileId: string): void {
+    if (this.seenProjectiles.size >= 1000) {
+      const oldestProjectile = this.seenProjectiles.values().next().value;
+      if (oldestProjectile) this.seenProjectiles.delete(oldestProjectile);
+    }
+    this.seenProjectiles.add(projectileId);
   }
 
   private getLastLines(content: string, numberOfLines: number): string[] {
