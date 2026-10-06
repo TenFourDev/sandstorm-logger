@@ -89,16 +89,19 @@ export class SandstormInGameService implements OnModuleInit, OnModuleDestroy {
     });
 
     this.sandstormWatcherService.read('mapChange', (server) => {
+      if (server.smokeLimitPerRound == null) return;
       this.logger.log(`[${server.name}] Map changed, resetting smoke projectile counts.`);
       this.resetSmokeProjectileCounts(server);
     });
 
     this.sandstormWatcherService.read('mapRestart', (server) => {
+      if (server.smokeLimitPerRound == null) return;
       this.logger.log(`[${server.name}] Map restarted, resetting smoke projectile counts.`);
       this.resetSmokeProjectileCounts(server);
     });
 
     this.sandstormWatcherService.read('roundStart', (server) => {
+      if (server.smokeLimitPerRound == null) return;
       this.logger.log(`[${server.name}] Round started, resetting smoke projectile counts.`);
       this.resetSmokeProjectileCounts(server);
     });
