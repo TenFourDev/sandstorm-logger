@@ -6,8 +6,8 @@ services:
       network: host
     restart: unless-stopped
     network_mode: host
-    environment:
-      DISCORD_TOKEN: ${DISCORD_TOKEN:?Set DISCORD_TOKEN in ./.env}
+    # environment:
       # CONFIG_FILE: /app/config.yaml
     volumes:
       - ./config.yaml:/app/config.yaml:ro
+      # - /path/to/Insurgency/Saved/Logs/Insurgency.log:/app/logs/Insurgency.log:ro

@@ -9,6 +9,8 @@ export interface ServerConfig {
   rconPassword?: string | null;
   inGamePlayerJoinFormat?: string | null;
   inGamePlayerLeaveFormat?: string | null;
+  smokeLimitPerRound?: number | null;
+  smokeAnnounceThreshold?: number | null;
 }
 
 export interface AppConfig {

@@ -4,8 +4,6 @@ import type { ServerConfig } from '../config/config.types.js';
 import { SandstormWatcherService } from './sandstorm-watcher.service.js';
 import { Rcon } from 'rcon-client';
 
-type RconConnection = import('rcon-client').Rcon;
-
 interface PlayerFormatData {
   playerName: string;
   steamId: string;
@@ -14,7 +12,9 @@ interface PlayerFormatData {
 @Injectable()
 export class SandstormInGameService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(SandstormInGameService.name);
-  private readonly connections = new Map<string, RconConnection>();
+  private readonly connections = new Map<string, Rcon>();
+  private readonly smokeProjectileCounts = new Map<string, Map<string, number>>();
+  private readonly playerNames = new Map<string, string>();
 
   constructor(
     private readonly configService: ConfigService,
@@ -44,6 +44,11 @@ export class SandstormInGameService implements OnModuleInit, OnModuleDestroy {
 
   private registerListeners(): void {
     this.sandstormWatcherService.read('playerConnected', (server, data) => {
+      this.playerNames.set(this.steamIdKey(data.steamId), data.playerName);
+      this.logger.log(
+        `[${server.name}] Player connected: ${data.playerName} (${data.steamId})`,
+      );
+
       const template = server.inGamePlayerJoinFormat;
       if (!template) return;
 
@@ -58,6 +63,71 @@ export class SandstormInGameService implements OnModuleInit, OnModuleDestroy {
       this.logger.log(`[${server.name}] In-game leave message for ${data.playerName}`);
       void this.say(server, this.formatMessage(template, data));
     });
+
+    this.sandstormWatcherService.read('projectileSpawned', (server, data) => {
+      const smokeLimit = server.smokeLimitPerRound;
+      if (smokeLimit == null) return;
+      
+      const projectileName = data.projectileName.toLowerCase();
+      if (!projectileName.includes('smoke') && !projectileName.includes('m18')) {
+        return;
+      }
+
+      const count = this.incrementSmokeProjectileCount(server, data.steamId);
+      const playerName = this.playerNames.get(this.steamIdKey(data.steamId)) ?? data.steamId;
+      const announceThreshold = server.smokeAnnounceThreshold ?? 1;
+
+      this.logger.debug(
+        `[${server.name}] ${playerName} Smoke deployed: ${count} / ${smokeLimit}`,
+      );
+      if (count >= announceThreshold) {
+        void this.say(server, `[${playerName}] Smoke deployed: ${count} / ${smokeLimit}`);
+      }
+
+      if (count > smokeLimit) {
+        this.logger.warn(
+          `[${server.name}] ${playerName} (${data.steamId}) exceeded the smoke limit (${count}/${smokeLimit}); kicking`,
+        );
+        void this.kick(server, data.steamId, 'Excessive Smoke');
+      }
+    });
+
+    this.sandstormWatcherService.read('mapChange', (server) => {
+      this.logger.log(`[${server.name}] Map changed, resetting smoke projectile counts.`);
+      this.resetSmokeProjectileCounts(server);
+    });
+
+    this.sandstormWatcherService.read('mapRestart', (server) => {
+      this.logger.log(`[${server.name}] Map restarted, resetting smoke projectile counts.`);
+      this.resetSmokeProjectileCounts(server);
+    });
+
+    this.sandstormWatcherService.read('roundStart', (server) => {
+      this.logger.log(`[${server.name}] Round started, resetting smoke projectile counts.`);
+      this.resetSmokeProjectileCounts(server);
+    });
+  }
+
+  private incrementSmokeProjectileCount(server: ServerConfig, steamId: string): number {
+    let counts = this.smokeProjectileCounts.get(server.name);
+    if (!counts) {
+      counts = new Map<string, number>();
+      this.smokeProjectileCounts.set(server.name, counts);
+    }
+
+    const count = (counts.get(steamId) ?? 0) + 1;
+    counts.set(steamId, count);
+    return count;
+  }
+
+  private resetSmokeProjectileCounts(server: ServerConfig): void {
+    if (this.smokeProjectileCounts.delete(server.name)) {
+      this.logger.log(`[${server.name}] Reset smoke projectile counts for the new match`);
+    }
+  }
+
+  private steamIdKey(steamId: string): string {
+    return steamId.replace(/^SteamNWI:/i, '');
   }
 
   private formatMessage(template: string, data: PlayerFormatData): string {
@@ -65,24 +135,32 @@ export class SandstormInGameService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async say(server: ServerConfig, content: string): Promise<void> {
+    await this.run(server, `say ${content}`);
+  }
+
+  private async kick(server: ServerConfig, steamId: string, reason: string): Promise<void> {
+    await this.run(server, `kick ${this.steamIdKey(steamId)} ${reason}`);
+  }
+
+  private async run(server: ServerConfig, command: string): Promise<void> {
     const client = await this.ensureConnection(server);
     if (!client) {
       this.logger.warn(
-        `[${server.name}] Failed to run "say" because RCON client is not available.`,
+        `[${server.name}] Failed to run "${command}" because RCON client is not available.`,
       );
       return;
     }
 
     try {
-      await client.send(`say ${this.sanitize(content)}`);
-      this.logger.log(`[${server.name}] Ran "say": ${content}`);
+      await client.send(this.sanitize(command));
+      this.logger.log(`[${server.name}] Ran "${command}"`);
     } catch (error) {
       this.connections.delete(server.name);
-      this.logger.error(`[${server.name}] Failed to run "say": ${this.describeError(error)}`);
+      this.logger.error(`[${server.name}] Failed to run "${command}": ${this.describeError(error)}`);
     }
   }
 
-  private async ensureConnection(server: ServerConfig): Promise<RconConnection | null> {
+  private async ensureConnection(server: ServerConfig): Promise<Rcon | null> {
     const existing = this.connections.get(server.name);
     if (existing && existing.authenticated && existing.socket) {
       return existing;
@@ -95,7 +173,7 @@ export class SandstormInGameService implements OnModuleInit, OnModuleDestroy {
     return this.connect(server);
   }
 
-  private async connect(server: ServerConfig): Promise<RconConnection | null> {
+  private async connect(server: ServerConfig): Promise<Rcon | null> {
     if (!server.rconHost || !server.rconPort || !server.rconPassword) {
       this.logger.warn(`[${server.name}] Rcon configuration is missing.`);
       return null;

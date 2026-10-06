@@ -16,6 +16,8 @@ const serverSchema = Joi.object({
   rconPassword: Joi.string().min(1).allow(null).optional(),
   inGamePlayerJoinFormat: Joi.string().min(1).allow(null).optional(),
   inGamePlayerLeaveFormat: Joi.string().min(1).allow(null).optional(),
+  smokeLimitPerRound: Joi.number().integer().min(0).allow(null).optional(),
+  smokeAnnounceThreshold: Joi.number().integer().min(1).allow(null).optional(),
 });
 
 const configSchema = Joi.object({

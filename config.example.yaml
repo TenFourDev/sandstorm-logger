@@ -1,7 +1,7 @@
 discordToken: '' # Optional
 servers:
   - name: 'Main Server'
-    logFilePath: '.../Insurgency.log'
+    logFilePath: '/app/logs/Insurgency.log'
 
     # Optional: broadcast join/leave messages on Discord channel, requires discordToken
     discordChannelId: '...'
@@ -14,3 +14,16 @@ servers:
     rconPassword: 'your-rcon-password'
     inGamePlayerJoinFormat: '{name} joined the server'
     inGamePlayerLeaveFormat: '{name} left the server'
+
+  
+    # Optional: limit smoke projectiles per player per round (kick when exceeded).
+    # Omit or set to null to disable smoke detection entirely.
+    # requires rcon connection and LogNetPartialBunch logging set to verbose on Engine.ini:
+    # ```
+    # [Core.Log]
+    # LogNetPartialBunch=Verbose
+    # ```
+    smokeLimitPerRound: 10
+    # Optional: only announce the running count from this throw onwards.
+    # Omit or set to null to announce from the very first throw.
+    smokeAnnounceThreshold: 8
