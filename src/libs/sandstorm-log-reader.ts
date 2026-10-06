@@ -233,7 +233,9 @@ export class SandstormLogReader extends TypedEventEmitter {
             }
           }
         } else if (line.includes(']LogSoldier: ') && line.includes(' is inside BP_Projectile_')) {
-          const projectileMatch = line.match(/(BP_Character_Player_C_\d+) is inside (BP_Projectile_\S+)_(\d+)/);
+          const projectileMatch = line.match(
+            /(BP_Character_Player_C_\d+) is inside (BP_Projectile_\S+)_(\d+)/,
+          );
           if (!projectileMatch || projectileMatch.length < 4) {
             this.tempLastLineChat.push(line);
             continue;
@@ -286,7 +288,8 @@ export class SandstormLogReader extends TypedEventEmitter {
   private trackControllerSteamId(line: string): void {
     if (line.includes(' got player ')) {
       const spawnMatch = line.match(/INSPlayerController_(\d+) got player \S+ \[(\d+)\]/);
-      if (spawnMatch) this.controllerSteamIds.set(`INSPlayerController_${spawnMatch[1]}`, spawnMatch[2]);
+      if (spawnMatch)
+        this.controllerSteamIds.set(`INSPlayerController_${spawnMatch[1]}`, spawnMatch[2]);
       return;
     }
 
@@ -297,15 +300,12 @@ export class SandstormLogReader extends TypedEventEmitter {
     const connectionMatch = line.match(/PC: (INSPlayerController_\d+),.*UniqueId: (SteamNWI:\d+)/);
     if (!connectionMatch) return;
 
-    this.controllerSteamIds.set(
-      connectionMatch[1],
-      connectionMatch[2].replace(/^SteamNWI:/i, ''),
-    );
+    this.controllerSteamIds.set(connectionMatch[1], connectionMatch[2].replace(/^SteamNWI:/i, ''));
   }
 
   private trackPossessedPawn(line: string): void {
     if (!line.includes('PAWNREUSE: ')) return;
-    
+
     const reuseMatch = line.match(
       /PAWNREUSE: '(INSPlayerController_\d+)' (?:possessing [^']*|cached new pawn) '(BP_Character_Player_C_\d+)'/,
     );
