@@ -220,7 +220,7 @@ export class SandstormLogReader extends TypedEventEmitter {
             });
 
             if (oldState === 'PreRound' && newState === 'RoundActive') {
-              this.emit('roundStart', { index: this.index };
+              this.emit('roundStart', { index: this.index });
             }
           }
         } else if (
