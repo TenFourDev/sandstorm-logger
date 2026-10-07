@@ -68,11 +68,11 @@ export class SandstormInGameService implements OnModuleInit, OnModuleDestroy {
 
       const projectileName = data.projectileName.toLowerCase();
       if (
-        (!projectileName.includes('smoke') && !projectileName.includes('m18')) ||
-        projectileName.includes('mortar')
-      ) {
-        return;
-      }
+        projectileName.includes('mortar') || 
+        projectileName.includes('artillery') ||
+        (!projectileName.includes('smoke') && !projectileName.includes('m18')) 
+      ) return;
+      
 
       const count = this.incrementSmokeProjectileCount(server, data.steamId);
       const playerName = this.playerNames.get(this.steamIdKey(data.steamId)) ?? data.steamId;
