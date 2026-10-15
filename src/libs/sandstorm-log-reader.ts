@@ -267,7 +267,7 @@ export class SandstormLogReader extends TypedEventEmitter {
               this.pendingProjectiles.set(projectileId, { pawnName, timestamp, timer });
             } else if (
               pawnName !== pending.pawnName &&
-              Math.abs(timestamp - pending.timestamp) <= 25
+              Math.abs(timestamp - pending.timestamp) === 0
             ) {
               clearTimeout(pending.timer);
               this.pendingProjectiles.delete(projectileId);
