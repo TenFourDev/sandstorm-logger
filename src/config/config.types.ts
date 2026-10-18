@@ -11,6 +11,7 @@ export interface ServerConfig {
   inGamePlayerLeaveFormat?: string | null;
   smokeLimitPerRound?: number | null;
   smokeAnnounceThreshold?: number | null;
+  roundCommand?: string[] | null;
 }
 
 export interface AppConfig {

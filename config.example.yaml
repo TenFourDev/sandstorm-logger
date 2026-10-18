@@ -29,3 +29,10 @@ servers:
     # Optional: only announce the running count from this throw onwards.
     # Omit or set to null to announce from the very first throw.
     smokeAnnounceThreshold: 8
+
+    # Optional: list of RCON commands to run when a round starts.
+    # Each entry is a complete command (include 'say ' yourself for chat).
+    # Commands run sequentially, in order. Requires rconHost/rconPort/rconPassword.
+    roundCommand:
+      - 'say Hello!'
+      - 'say Join our Discord server: ...'

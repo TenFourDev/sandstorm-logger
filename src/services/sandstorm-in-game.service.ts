@@ -26,7 +26,12 @@ export class SandstormInGameService implements OnModuleInit, OnModuleDestroy {
   async onModuleInit(): Promise<void> {
     await Promise.all(
       this.configService.servers
-        .filter((server) => server.inGamePlayerJoinFormat || server.inGamePlayerLeaveFormat)
+        .filter(
+          (server) =>
+            server.inGamePlayerJoinFormat ||
+            server.inGamePlayerLeaveFormat ||
+            (server.roundCommand && server.roundCommand.length > 0),
+        )
         .map((server) => this.connect(server)),
     );
   }
@@ -104,10 +109,26 @@ export class SandstormInGameService implements OnModuleInit, OnModuleDestroy {
     });
 
     this.sandstormWatcherService.read('roundStart', (server) => {
-      if (server.smokeLimitPerRound == null) return;
-      this.logger.log(`[${server.name}] Round started, resetting smoke projectile counts.`);
-      this.resetSmokeProjectileCounts(server);
+      if (server.smokeLimitPerRound != null) {
+        this.logger.log(`[${server.name}] Round started, resetting smoke projectile counts.`);
+        this.resetSmokeProjectileCounts(server);
+      }
+
+      void this.runRoundCommands(server);
     });
+  }
+
+  private async runRoundCommands(server: ServerConfig): Promise<void> {
+    const commands = server.roundCommand;
+    if (!commands || commands.length === 0) return;
+
+    this.logger.log(
+      `[${server.name}] Round started, running ${commands.length} round command(s)`,
+    );
+
+    for (const command of commands) {
+      await this.run(server, command);
+    }
   }
 
   private incrementSmokeProjectileCount(server: ServerConfig, steamId: string): number {

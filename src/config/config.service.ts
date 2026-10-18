@@ -18,6 +18,7 @@ const serverSchema = Joi.object({
   inGamePlayerLeaveFormat: Joi.string().min(1).allow(null).optional(),
   smokeLimitPerRound: Joi.number().integer().min(0).allow(null).optional(),
   smokeAnnounceThreshold: Joi.number().integer().min(1).allow(null).optional(),
+  roundCommand: Joi.array().items(Joi.string().min(1)).allow(null).optional(),
 });
 
 const configSchema = Joi.object({
@@ -96,7 +97,9 @@ export class ConfigService {
 
     for (const server of config.servers) {
       const usesInGameMessaging = Boolean(
-        server.inGamePlayerJoinFormat || server.inGamePlayerLeaveFormat,
+        server.inGamePlayerJoinFormat ||
+          server.inGamePlayerLeaveFormat ||
+          (server.roundCommand && server.roundCommand.length),
       );
       if (!usesInGameMessaging) {
         continue;
@@ -107,7 +110,7 @@ export class ConfigService {
       );
       if (missing.length > 0) {
         problems.push(
-          `  - servers.${server.name}: ${missing.join(', ')} required when inGamePlayerJoinFormat/inGamePlayerLeaveFormat is set`,
+          `  - servers.${server.name}: ${missing.join(', ')} required when inGamePlayerJoinFormat/inGamePlayerLeaveFormat/roundCommand is set`,
         );
       }
     }
