@@ -38,6 +38,10 @@ export interface SandstormRoundStartedEvent {
   index: number;
 }
 
+export interface SandstormPreRoundStartedEvent {
+  index: number;
+}
+
 interface PlayerRecord {
   name: string;
   steamId: string;
@@ -52,6 +56,7 @@ type SandstormLogReaderEvents = {
   mapChange: (event: { index: number; map: string; scenario: string }) => void;
   mapRestart: (event: { index: number; map: string; scenario: string }) => void;
   stateChange: (event: { index: number; oldState: string; newState: string }) => void;
+  preRoundStart: (event: SandstormPreRoundStartedEvent) => void;
   roundStart: (event: SandstormRoundStartedEvent) => void;
   error: (error: unknown) => void;
 };
@@ -227,6 +232,10 @@ export class SandstormLogReader extends TypedEventEmitter {
               oldState,
               newState,
             });
+
+            if (newState === 'PreRound' && oldState !== 'PreRound') {
+              this.emit('preRoundStart', { index: this.index });
+            }
 
             if (oldState === 'PreRound' && newState === 'RoundActive') {
               this.emit('roundStart', { index: this.index });

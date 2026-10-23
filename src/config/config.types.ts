@@ -12,6 +12,7 @@ export interface ServerConfig {
   smokeLimitPerRound?: number | null;
   smokeAnnounceThreshold?: number | null;
   roundCommand?: string[] | null;
+  preRoundCommand?: string[] | null;
 }
 
 export interface AppConfig {

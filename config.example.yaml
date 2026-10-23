@@ -30,9 +30,26 @@ servers:
     # Omit or set to null to announce from the very first throw.
     smokeAnnounceThreshold: 8
 
-    # Optional: list of RCON commands to run when a round starts.
+    # Optional: list of RCON commands to run when a round starts
     # Each entry is a complete command (include 'say ' yourself for chat).
     # Commands run sequentially, in order. Requires rconHost/rconPort/rconPassword.
     roundCommand:
       - 'say Hello!'
       - 'say Join our Discord server: ...'
+
+    # Optional: list of RCON commands to run when the pre-round starts
+    # Same format and requirements as roundCommand.
+    preRoundCommand:
+      - 'say Get ready!'
+
+    # Custom server-side mutators, making use of changing gamemodeproperty dynamically
+    # Requires RCON connection
+    mutators:
+      revolution:
+        initialMinimumEnemies: 2
+        initialMaximumEnemies: 16
+        minimumEnemiesPerObjectiveCaptured: 1
+        maximumEnemiesPerObjectiveCaptured: 0.5
+        initialSupplyPoint: 0
+        
+

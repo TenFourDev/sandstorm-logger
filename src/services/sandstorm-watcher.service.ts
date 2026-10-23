@@ -8,6 +8,7 @@ import {
   type SandstormMessageEvent,
   type SandstormPlayerConnectedEvent,
   type SandstormPlayerDisconnectedEvent,
+  type SandstormPreRoundStartedEvent,
   type SandstormRoundStartedEvent,
 } from '../libs/sandstorm-log-reader.js';
 
@@ -22,6 +23,7 @@ type SandstormWatcherEvents = {
   mapChange: (server: ServerConfig, eventData: SandstormMapChangedEvent) => void;
   mapRestart: (server: ServerConfig, eventData: SandstormMapChangedEvent) => void;
   stateChange: (server: ServerConfig, eventData: SandstormStateChangedEvent) => void;
+  preRoundStart: (server: ServerConfig, eventData: SandstormPreRoundStartedEvent) => void;
   roundStart: (server: ServerConfig, eventData: SandstormRoundStartedEvent) => void;
   error: (server: ServerConfig, eventData: unknown) => void;
 };
@@ -86,6 +88,9 @@ export class SandstormWatcherService extends TypedEventEmitter implements OnModu
       });
       reader.on('stateChange', (eventData) => {
         this.emit('stateChange', server, eventData);
+      });
+      reader.on('preRoundStart', (eventData) => {
+        this.emit('preRoundStart', server, eventData);
       });
       reader.on('roundStart', (eventData) => {
         this.emit('roundStart', server, eventData);
